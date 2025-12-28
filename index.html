@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Glass Notes Pro (Fixed)</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                    },
+                    colors: {
+                        glass: {
+                            100: 'rgba(255, 255, 255, 0.05)',
+                            200: 'rgba(255, 255, 255, 0.1)',
+                            modal: 'rgba(20, 20, 25, 0.9)', /* Sedikit lebih gelap agar fokus */
+                            border: 'rgba(255, 255, 255, 0.1)',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.4); }
+
+        .prose-custom h1 { font-size: 2.25em; font-weight: 800; color: white; margin-bottom: 0.8em; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.3em; }
+        .prose-custom h2 { font-size: 1.75em; font-weight: 700; color: #f3f4f6; margin-top: 1.5em; margin-bottom: 0.8em; }
+        .prose-custom p { margin-bottom: 1.2em; line-height: 1.7; color: #d1d5db; font-size: 1.1em; }
+        .prose-custom ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 1.2em; color: #d1d5db; }
+        .prose-custom blockquote { border-left: 4px solid #6366f1; padding-left: 1em; margin: 1.5em 0; font-style: italic; color: #9ca3af; background: rgba(255,255,255,0.05); padding: 1em; border-radius: 0 8px 8px 0; }
+        .prose-custom code { background: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #fcd34d; }
+        .prose-custom pre { background: rgba(0,0,0,0.4); padding: 1.5em; border-radius: 12px; overflow-x: auto; margin-bottom: 1.5em; border: 1px solid rgba(255,255,255,0.1); }
+        .prose-custom a { color: #60a5fa; text-decoration: underline; text-underline-offset: 4px; }
+        .prose-custom img { border-radius: 8px; max-width: 100%; margin: 1em 0; }
+
+        .blob {
+            position: absolute; filter: blur(90px); z-index: -1; opacity: 0.5;
+            animation: move 25s infinite alternate;
+        }
+        @keyframes move {
+            from { transform: translate(0, 0) scale(1); }
+            to { transform: translate(30px, -30px) scale(1.1); }
+        }
+
+        /* Modal Transitions */
+        .modal-bg { transition: opacity 0.3s ease; }
+        .modal-content { transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease; }
+        
+        .modal-hidden .modal-bg { opacity: 0; pointer-events: none; }
+        .modal-hidden .modal-content { transform: scale(0.95) translateY(10px); opacity: 0; pointer-events: none; }
+
+.modal-hidden {
+    pointer-events: none;
+}
+
+    </style>
+</head>
+<body class="bg-[#0f1014] text-white h-screen flex items-center justify-center overflow-hidden selection:bg-indigo-500 selection:text-white">
+
+    <div class="blob bg-indigo-600 w-[500px] h-[500px] rounded-full top-[-100px] left-[-100px]"></div>
+    <div class="blob bg-purple-600 w-[400px] h-[400px] rounded-full bottom-[-50px] right-[-50px] animation-delay-2000"></div>
+    <div class="blob bg-cyan-600 w-80 h-80 rounded-full top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"></div>
+
+    <div class="w-full h-full md:h-[92vh] md:w-[95vw] lg:w-[90vw] md:rounded-3xl border border-glass-border bg-glass-100 backdrop-blur-3xl shadow-2xl flex flex-col md:flex-row overflow-hidden relative z-10">
+        
+        <aside class="w-full md:w-80 border-b md:border-b-0 md:border-r border-glass-border flex flex-col bg-glass-100/40 relative z-20">
+            <div class="p-5 border-b border-glass-border flex items-center justify-between relative z-30">
+                <h1 class="font-bold text-lg tracking-tight bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent pointer-events-none">Glass Notes</h1>
+                
+                <button id="btnNewNote" onclick="openNewNoteModal()" class="relative z-50 cursor-pointer text-xs font-semibold bg-indigo-500 hover:bg-indigo-600 transition text-white px-4 py-2 rounded-lg shadow-lg shadow-indigo-500/20 flex items-center gap-2 select-none active:scale-95 transform duration-100">
+                    <i class="ph ph-plus-bold"></i> Baru
+                </button>
+            </div>
+
+            <div class="px-5 py-4 relative z-20">
+                <div class="relative group">
+                    <i class="ph ph-magnifying-glass absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-white transition"></i>
+                    <input type="text" id="searchInput" placeholder="Cari catatan..." 
+                        class="w-full bg-white/5 text-sm text-white placeholder-gray-400 rounded-xl pl-10 pr-3 py-2.5 outline-none border border-white/5 focus:border-indigo-500/50 focus:bg-white/10 transition relative z-20">
+                </div>
+            </div>
+
+            <div id="notesList" class="flex-1 overflow-y-auto px-3 space-y-1 pb-4 relative z-10">
+                </div>
+            
+            <div class="p-4 text-center text-xs font-medium text-gray-400 border-t border-glass-border bg-black/10">
+                <span id="noteCount">0</span> Catatan
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col relative bg-transparent z-10">
+            <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center text-gray-400 z-0 select-none pointer-events-none">
+                <div class="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mb-6 backdrop-blur-sm border border-white/5">
+                    <i class="ph ph-pencil-simple-slash text-4xl opacity-50"></i>
+                </div>
+                <p class="text-xl font-medium text-white/80">Belum ada catatan dipilih</p>
+                <p class="text-sm mt-2 opacity-60">Pilih dari sidebar atau buat baru</p>
+            </div>
+
+            <div id="editorContainer" class="flex flex-col h-full hidden z-10 relative">
+                <header class="h-20 border-b border-glass-border flex items-center justify-between px-8 bg-glass-100/20 relative z-20">
+                    <input type="text" id="noteTitle" placeholder="Judul Catatan" 
+                        class="bg-transparent text-2xl font-bold text-white placeholder-gray-600 outline-none w-full mr-8 truncate focus:placeholder-gray-500">
+                    
+                    <div class="flex items-center space-x-3 shrink-0">
+                        <span id="lastSaved" class="text-xs text-gray-400 font-mono mr-4 hidden md:block"></span>
+                        
+                        <button onclick="openPreviewModal()" class="cursor-pointer relative z-50 flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-white/10 hover:bg-white/20 border border-white/10 rounded-lg transition active:scale-95">
+                            <i class="ph ph-eye text-lg"></i>
+                            <span class="hidden lg:inline">Preview</span>
+                        </button>
+                        
+                        <button onclick="deleteCurrentNote()" class="cursor-pointer relative z-50 p-2 w-10 h-10 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-500/20 hover:text-red-300 transition border border-transparent hover:border-red-500/20 active:scale-95">
+                            <i class="ph ph-trash text-lg"></i>
+                        </button>
+                    </div>
+                </header>
+
+                <div class="flex-1 relative z-10">
+                    <textarea id="noteBody" 
+                        class="w-full h-full bg-transparent p-8 resize-none outline-none text-gray-200 font-mono text-base leading-relaxed selection:bg-indigo-500/50"
+                        placeholder="Mulai menulis Markdown di sini..."></textarea>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="newNoteModal" class="fixed inset-0 z-[100] flex items-center justify-center modal-hidden">
+        <div class="modal-bg absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeNewNoteModal()"></div>
+        
+        <div class="modal-content relative w-[90%] max-w-md bg-[#1a1b20] border border-white/10 rounded-2xl shadow-2xl p-6 overflow-hidden z-[101]">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
+            
+            <h3 class="text-xl font-bold text-white mb-2">Catatan Baru</h3>
+            <p class="text-gray-400 text-sm mb-6">Berikan judul untuk catatan baru Anda.</p>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Judul</label>
+                    <input type="text" id="newNoteTitleInput" 
+                        class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white outline-none focus:border-indigo-500 focus:bg-white/10 transition"
+                        placeholder="Contoh: Ide Proyek Web" onkeydown="if(event.key === 'Enter') createNoteAction()">
+                </div>
+                
+                <div class="flex justify-end gap-3 pt-2">
+                    <button onclick="closeNewNoteModal()" class="cursor-pointer px-5 py-2.5 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">Batal</button>
+                    <button onclick="createNoteAction()" class="cursor-pointer px-5 py-2.5 text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg shadow-lg shadow-indigo-600/20 transition">Buat Catatan</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="previewModal" class="fixed inset-0 z-[100] flex items-center justify-center modal-hidden">
+        <div class="modal-bg absolute inset-0 bg-black/80 backdrop-blur-md" onclick="closePreviewModal()"></div>
+        
+        <div class="modal-content relative w-[95%] max-w-5xl h-[90vh] bg-glass-modal border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden z-[101]">
+            <div class="h-16 border-b border-white/10 flex items-center justify-between px-8 bg-black/20 shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-2 h-8 bg-indigo-500 rounded-full"></div>
+                    <h2 class="text-lg font-bold text-white tracking-wide">Preview Mode</h2>
+                </div>
+                <button onclick="closePreviewModal()" class="cursor-pointer w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition">
+                    <i class="ph ph-x"></i>
+                </button>
+            </div>
+            
+            <div id="fullPreviewContent" class="flex-1 overflow-y-auto p-8 md:p-12 prose-custom">
+                </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- State ---
+            let notes = JSON.parse(localStorage.getItem('glass-notes-revisi')) || [];
+            let activeNoteId = null;
+
+            // --- Elements ---
+            const els = {
+                list: document.getElementById('notesList'),
+                search: document.getElementById('searchInput'),
+                count: document.getElementById('noteCount'),
+                empty: document.getElementById('emptyState'),
+                editor: document.getElementById('editorContainer'),
+                title: document.getElementById('noteTitle'),
+                body: document.getElementById('noteBody'),
+                lastSaved: document.getElementById('lastSaved'),
+                
+                // Modals
+                modalNew: document.getElementById('newNoteModal'),
+                inputNewTitle: document.getElementById('newNoteTitleInput'),
+                modalPreview: document.getElementById('previewModal'),
+                previewContent: document.getElementById('fullPreviewContent')
+            };
+
+            // --- Init ---
+            renderNotesList();
+
+            // --- Expose functions to Global Scope for HTML onclick attributes ---
+            window.openNewNoteModal = function() {
+                console.log("Opening Modal..."); // Debugging
+                els.inputNewTitle.value = '';
+                els.modalNew.classList.remove('modal-hidden');
+                setTimeout(() => els.inputNewTitle.focus(), 100);
+            }
+
+            window.closeNewNoteModal = function() {
+                els.modalNew.classList.add('modal-hidden');
+            }
+
+            window.createNoteAction = function() {
+                const title = els.inputNewTitle.value.trim() || 'Tanpa Judul';
+                
+                const newNote = {
+                    id: Date.now(),
+                    title: title,
+                    body: '',
+                    updatedAt: new Date().toISOString()
+                };
+
+                notes.unshift(newNote);
+                saveToStorage();
+                setActiveNote(newNote.id);
+                renderNotesList();
+                closeNewNoteModal();
+                
+                els.body.focus();
+            }
+
+            window.openPreviewModal = function() {
+                if (!activeNoteId) return;
+                const note = notes.find(n => n.id === activeNoteId);
+                
+                // Render Markdown
+                const rawHtml = marked.parse(note.body || '*Tidak ada konten*');
+                els.previewContent.innerHTML = rawHtml;
+                
+                els.modalPreview.classList.remove('modal-hidden');
+            }
+
+            window.closePreviewModal = function() {
+                els.modalPreview.classList.add('modal-hidden');
+            }
+
+            window.deleteCurrentNote = function() {
+                if(!confirm("Hapus catatan ini secara permanen?")) return;
+                
+                notes = notes.filter(n => n.id !== activeNoteId);
+                saveToStorage();
+                
+                if (notes.length > 0) {
+                    setActiveNote(notes[0].id);
+                } else {
+                    activeNoteId = null;
+                    els.empty.classList.remove('hidden');
+                    els.editor.classList.add('hidden');
+                    els.editor.classList.remove('flex');
+                    els.empty.style.pointerEvents = 'none'; // Ensure empty state doesn't block
+                }
+                renderNotesList();
+            }
+
+            // --- Event Listeners ---
+            els.search.addEventListener('input', (e) => renderNotesList(e.target.value));
+            
+            els.title.addEventListener('input', () => {
+                updateCurrentNote();
+                renderNotesList();
+            });
+            
+            els.body.addEventListener('input', () => {
+                updateCurrentNote();
+            });
+
+            // --- Core Logic ---
+            function setActiveNote(id) {
+                activeNoteId = id;
+                const note = notes.find(n => n.id === id);
+
+                if (note) {
+                    els.empty.classList.add('hidden');
+                    els.editor.classList.remove('hidden');
+                    els.editor.classList.add('flex');
+                    
+                    els.title.value = note.title;
+                    els.body.value = note.body;
+                    
+                    updateLastSaved(note.updatedAt);
+                    renderNotesList(); 
+                } else {
+                    els.empty.classList.remove('hidden');
+                    els.editor.classList.add('hidden');
+                    els.editor.classList.remove('flex');
+                }
+            }
+
+            function updateCurrentNote() {
+                const note = notes.find(n => n.id === activeNoteId);
+                if (!note) return;
+
+                note.title = els.title.value;
+                note.body = els.body.value;
+                note.updatedAt = new Date().toISOString();
+
+                saveToStorage();
+                updateLastSaved(note.updatedAt);
+            }
+
+            function renderNotesList(query = '') {
+                els.list.innerHTML = '';
+                
+                const filteredNotes = notes.filter(note => {
+                    const q = query.toLowerCase();
+                    const bodyText = note.body ? note.body.toLowerCase() : '';
+                    return note.title.toLowerCase().includes(q) || bodyText.includes(q);
+                });
+
+                els.count.innerText = filteredNotes.length;
+
+                filteredNotes.forEach(note => {
+                    const isActive = note.id === activeNoteId;
+                    const date = new Date(note.updatedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+                    const cleanBody = note.body ? note.body.replace(/[#*`_]/g, '') : '';
+                    const snippet = cleanBody.substring(0, 45) + (cleanBody.length > 45 ? '...' : '');
+
+                    const div = document.createElement('div');
+                    // Ensure List Item is Clickable (relative z-10)
+                    div.className = `p-4 rounded-xl cursor-pointer transition-all duration-200 group border mb-2 relative z-10 ${
+                        isActive 
+                        ? 'bg-white/10 border-white/10 shadow-lg translate-x-1' 
+                        : 'bg-transparent border-transparent hover:bg-white/5 hover:translate-x-1'
+                    }`;
+                    div.onclick = () => setActiveNote(note.id);
+
+                    div.innerHTML = `
+                        <h4 class="font-semibold text-sm text-gray-100 truncate mb-1.5 leading-tight ${isActive ? 'text-white' : ''}">
+                            ${note.title || 'Tanpa Judul'}
+                        </h4>
+                        <div class="flex flex-col gap-1">
+                            <span class="text-[11px] font-medium text-indigo-300/80 uppercase tracking-wide">${date}</span>
+                            <span class="text-xs text-gray-300/70 truncate leading-relaxed group-hover:text-gray-200 transition-colors">
+                                ${snippet || '<span class="italic opacity-50">Kosong...</span>'}
+                            </span>
+                        </div>
+                    `;
+                    els.list.appendChild(div);
+                });
+            }
+
+            function saveToStorage() {
+                localStorage.setItem('glass-notes-revisi', JSON.stringify(notes));
+            }
+
+            function updateLastSaved(isoString) {
+                const time = new Date(isoString).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                els.lastSaved.innerText = `Disimpan ${time}`;
+            }
+            
+            // Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    closeNewNoteModal();
+                    closePreviewModal();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
