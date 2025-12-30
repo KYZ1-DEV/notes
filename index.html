@@ -125,7 +125,15 @@
                             <i class="ph ph-eye text-lg"></i>
                             <span class="hidden lg:inline">Preview</span>
                         </button>
-                        
+
+                        <button onclick="exportMarkdown()" 
+                            class="cursor-pointer relative z-50 flex items-center gap-2 px-4 py-2 text-sm font-medium 
+                            text-white bg-emerald-500/20 hover:bg-emerald-500/30 
+                            border border-emerald-500/30 rounded-lg transition active:scale-95">
+                            <i class="ph ph-download-simple text-lg"></i>
+                            <span class="hidden lg:inline">Export MD</span>
+                        </button>
+
                         <button onclick="deleteCurrentNote()" class="cursor-pointer relative z-50 p-2 w-10 h-10 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-500/20 hover:text-red-300 transition border border-transparent hover:border-red-500/20 active:scale-95">
                             <i class="ph ph-trash text-lg"></i>
                         </button>
@@ -287,6 +295,32 @@
             els.body.addEventListener('input', () => {
                 updateCurrentNote();
             });
+
+              window.exportMarkdown = function () {
+        if (!activeNoteId) return;
+
+        const note = notes.find(n => n.id === activeNoteId);
+        if (!note) return;
+
+        const filename = (note.title || 'catatan')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/(^-|-$)/g, '');
+
+        const markdownContent = `# ${note.title}\n\n${note.body || ''}`;
+
+        const blob = new Blob([markdownContent], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${filename}.md`;
+        document.body.appendChild(a);
+        a.click();
+
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
 
             // --- Core Logic ---
             function setActiveNote(id) {
